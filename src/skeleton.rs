@@ -7,12 +7,12 @@ use crate::slot::Slot;
 use crate::transform_constraint::TransformConstraint;
 use crate::updatable::Updatable;
 use crate::utils::color::Color;
-use std::borrow::Borrow;
+use std::{cell::RefCell, rc::Rc};
 
 pub struct Skeleton<'a> {
-    data: SkeletonData<'a>,
-    bones: Vec<Bone<'a>>,
-    pub(crate) slots: Vec<Slot<'a>>,
+    pub(crate) data: Rc<RefCell<SkeletonData<'a>>>,
+    pub(crate) bones: Rc<RefCell<Vec<Bone<'a>>>>,
+    pub(crate) slots: Rc<RefCell<Vec<Slot<'a>>>>,
     ikConstraints: Vec<IkConstraint<'a>>,
     transformConstraints: Vec<TransformConstraint<'a>>,
     pathConstraints: Vec<PathConstraint<'a>>,
@@ -30,9 +30,9 @@ pub struct Skeleton<'a> {
 
 impl<'a> Skeleton<'a> {
     pub fn new(data: SkeletonData<'a>) -> Self {
-        let mut i = Self {
-            bones: Vec::with_capacity(data.bones.len()),
-            slots: Vec::with_capacity(data.slots.len()),
+        let i = Self {
+            bones: Rc::new(RefCell::new(Vec::with_capacity(data.bones.len()))),
+            slots: Rc::new(RefCell::new(Vec::with_capacity(data.slots.len()))),
             ikConstraints: Vec::with_capacity(data.ikConstraints.len()),
             transformConstraints: Vec::with_capacity(data.transformConstraints.len()),
             pathConstraints: Vec::with_capacity(data.pathConstraints.len()),
@@ -51,7 +51,7 @@ impl<'a> Skeleton<'a> {
             scaleY: 1.0,
             x: 0.0,
             y: 0.0,
-            data,
+            data: Rc::new(RefCell::new(data)),
         };
 
         for boneData in &i.data.bones {
@@ -59,12 +59,13 @@ impl<'a> Skeleton<'a> {
             if boneData.parent.is_none() {
                 bone = Bone::new(boneData, &i, None);
             } else {
-                let mut parent = i.bones.get_mut(boneData.parent.unwrap().index as usize);
-                parent.unwrap().children.push(&bone);
+                let mut parent = &i.bones.get_mut(boneData.parent.unwrap().index as usize);
                 bone = Bone::new(boneData, &i, parent.as_deref());
+                parent.unwrap().children.push(&bone);
             }
-            i.bones.push(bone);
+            &i.bones.push(bone);
         }
+
         return i;
     }
 }
